@@ -1,0 +1,107 @@
+
+Merging object attributes
+
+
+Discarded input sections
+
+ .text          0x00000000        0x0 src/main.o
+ .data          0x00000000        0x0 src/main.o
+ .bss           0x00000000        0x0 src/main.o
+ .text          0x00000000        0x0 src/startup.o
+ .data          0x00000000        0x0 src/startup.o
+ .bss           0x00000000        0x0 src/startup.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00008000         xr
+RAM              0x20000000         0x00020000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD src/main.o
+LOAD src/startup.o
+                0x20020000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+
+.isr_vector     0x08000000       0x80
+                0x08000000                        . = ALIGN (0x80)
+ *(.isr_vector)
+ .isr_vector    0x08000000       0x40 src/startup.o
+                0x08000080                        . = ALIGN (0x80)
+ *fill*         0x08000040       0x40 
+
+.text           0x08000080       0x4c
+ *(.text)
+ *(.text.*)
+ .text.main     0x08000080        0x8 src/main.o
+                0x08000080                main
+ .text.Reset_Handler
+                0x08000088       0x40 src/startup.o
+                0x08000088                Reset_Handler
+ .text.Default_Handler
+                0x080000c8        0x4 src/startup.o
+                0x080000c8                DebugMon_Handler
+                0x080000c8                HardFault_Handler
+                0x080000c8                SysTick_Handler
+                0x080000c8                PendSV_Handler
+                0x080000c8                NMI_Handler
+                0x080000c8                UsageFault_Handler
+                0x080000c8                Default_Handler
+                0x080000c8                MemManage_Handler
+                0x080000c8                SVC_Handler
+                0x080000c8                BusFault_Handler
+
+.glue_7         0x080000cc        0x0
+ .glue_7        0x080000cc        0x0 linker stubs
+
+.glue_7t        0x080000cc        0x0
+ .glue_7t       0x080000cc        0x0 linker stubs
+
+.vfp11_veneer   0x080000cc        0x0
+ .vfp11_veneer  0x080000cc        0x0 linker stubs
+
+.v4_bx          0x080000cc        0x0
+ .v4_bx         0x080000cc        0x0 linker stubs
+
+.iplt           0x080000cc        0x0
+ .iplt          0x080000cc        0x0 src/startup.o
+
+.rel.dyn        0x080000cc        0x0
+ .rel.iplt      0x080000cc        0x0 src/startup.o
+
+.rodata
+ *(.rodata)
+ *(.rodata.*)
+                0x080000cc                        _sidata = LOADADDR (.data)
+
+.data           0x20000000        0x0 load address 0x080000cc
+                0x20000000                        _sdata = .
+ *(.data)
+ *(.data.*)
+                0x20000000                        _edata = .
+
+.igot.plt       0x20000000        0x0 load address 0x080000cc
+ .igot.plt      0x20000000        0x0 src/startup.o
+
+.bss            0x20000000        0x0 load address 0x080000cc
+                0x20000000                        _sbss = .
+ *(.bss)
+ *(.bss.*)
+ *(COMMON)
+                0x20000000                        _ebss = .
+                0x20000000                        . = ALIGN (0x8)
+                0x20000000                        _end = .
+OUTPUT(bootloader.elf elf32-littlearm)
+LOAD linker stubs
+
+.comment        0x00000000       0x1e
+ .comment       0x00000000       0x1e src/main.o
+                                 0x1f (size before relaxing)
+
+.ARM.attributes
+                0x00000000       0x30
+ .ARM.attributes
+                0x00000000       0x2e src/main.o
+ .ARM.attributes
+                0x0000002e       0x25 src/startup.o

@@ -37,6 +37,7 @@ SECTIONS
     /*
      * The vector table is placed at the beginning of the Flash memory
      */
+    
     .isr_vector :
     {
         /*
@@ -44,7 +45,12 @@ SECTIONS
          * KEEP() prevents the linker from discarding the section
          * even if it appears to be unused.
          */
+        . = ALIGN(128);
+
         KEEP(*(.isr_vector))
+
+        . = ALIGN(128);
+        
     } > FLASH
 
 
