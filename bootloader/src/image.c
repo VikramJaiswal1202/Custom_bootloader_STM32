@@ -155,6 +155,7 @@ int image_erase(uint32_t address, uint32_t size)
 int image_program(uint32_t address,
                   const uint8_t *data,
                   uint32_t size)
+
 {
     uint32_t i;
     uint32_t word;
@@ -245,4 +246,64 @@ int image_program(uint32_t address,
 
 
     return 0;
+}
+
+
+
+/* =========================
+
+* Verify firmware image
+* ========================= */
+
+int image_verify(uint32_t address,
+const uint8_t *data,
+uint32_t size)
+{
+uint32_t i;
+volatile const uint8_t *flash_data;
+
+
+/*
+ * Check starting address.
+ */
+if (address < APP_FLASH_START ||
+    address >= APP_FLASH_END)
+{
+    return -1;
+}
+
+/*
+ * Check image size.
+ */
+if (size == 0U ||
+    size > (APP_FLASH_END - address))
+{
+    return -1;
+}
+
+/*
+ * Point to the firmware stored in Flash.
+ *
+ * STM32 memory-maps internal Flash,
+ * so we can read it like normal memory.
+ */
+flash_data = (volatile const uint8_t *)address;
+
+/*
+ * Compare every image byte.
+ */
+for (i = 0U; i < size; i++)
+{
+    if (flash_data[i] != data[i])
+    {
+        return -1;
+    }
+}
+
+/*
+ * Every byte matched.
+ */
+return 0;
+
+
 }

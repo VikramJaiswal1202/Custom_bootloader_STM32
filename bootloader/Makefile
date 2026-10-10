@@ -19,9 +19,8 @@ LDFLAGS = -T linker.ld \
           -Wl,--gc-sections \
           -Wl,-Map=$(TARGET).map
 
-C_SOURCES = src/main.c \
-            src/flash.c \
-            src/image.c
+C_SOURCES = src/main.c src/flash.c src/image.c src/app.c src/uart.c
+
 
 ASM_SOURCES = startup/startup.s
 
