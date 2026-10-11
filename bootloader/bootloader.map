@@ -10,33 +10,11 @@ Discarded input sections
  .text          0x00000000        0x0 src/flash.o
  .data          0x00000000        0x0 src/flash.o
  .bss           0x00000000        0x0 src/flash.o
- .text.flash_unlock
-                0x00000000       0x30 src/flash.o
- .text.flash_lock
-                0x00000000       0x1c src/flash.o
- .text.flash_wait_ready
-                0x00000000       0x20 src/flash.o
- .text.flash_has_error
-                0x00000000       0x24 src/flash.o
- .text.flash_erase_sector
-                0x00000000       0x98 src/flash.o
- .text.flash_program_word
-                0x00000000       0xc0 src/flash.o
- .comment       0x00000000       0x1f src/flash.o
- .ARM.attributes
-                0x00000000       0x2e src/flash.o
  .text          0x00000000        0x0 src/image.o
  .data          0x00000000        0x0 src/image.o
  .bss           0x00000000        0x0 src/image.o
- .text.image_erase
-                0x00000000      0x13c src/image.o
- .text.image_program
-                0x00000000      0x124 src/image.o
  .text.image_verify
                 0x00000000       0x84 src/image.o
- .comment       0x00000000       0x1f src/image.o
- .ARM.attributes
-                0x00000000       0x2e src/image.o
  .text          0x00000000        0x0 src/app.o
  .data          0x00000000        0x0 src/app.o
  .bss           0x00000000        0x0 src/app.o
@@ -78,76 +56,107 @@ LOAD startup/startup.o
                 0x08000080                        . = ALIGN (0x80)
  *fill*         0x08000040       0x40 
 
-.text           0x08000080      0x36c
+.text           0x08000080      0x934
  *(.text)
  *(.text.*)
- .text.parse_size
-                0x08000080       0x84 src/main.o
  .text.uart_write_string
-                0x08000104       0x2c src/main.o
+                0x08000080       0x2c src/main.o
+ .text.verify_chunk
+                0x080000ac       0x80 src/main.o
+ .text.receive_firmware
+                0x0800012c      0x130 src/main.o
+ .text.parse_size
+                0x0800025c       0x7c src/main.o
  .text.process_command
-                0x08000130      0x110 src/main.o
- .text.main     0x08000240       0x7c src/main.o
-                0x08000240                main
+                0x080002d8       0xe8 src/main.o
+ .text.main     0x080003c0       0x7c src/main.o
+                0x080003c0                main
+ .text.flash_unlock
+                0x0800043c       0x30 src/flash.o
+                0x0800043c                flash_unlock
+ .text.flash_lock
+                0x0800046c       0x1c src/flash.o
+                0x0800046c                flash_lock
+ .text.flash_wait_ready
+                0x08000488       0x20 src/flash.o
+                0x08000488                flash_wait_ready
+ .text.flash_has_error
+                0x080004a8       0x24 src/flash.o
+                0x080004a8                flash_has_error
+ .text.flash_erase_sector
+                0x080004cc       0x98 src/flash.o
+                0x080004cc                flash_erase_sector
+ .text.flash_program_word
+                0x08000564       0xc0 src/flash.o
+                0x08000564                flash_program_word
+ .text.image_erase
+                0x08000624      0x13c src/image.o
+                0x08000624                image_erase
+ .text.image_program
+                0x08000760      0x124 src/image.o
+                0x08000760                image_program
  .text.uart2_init
-                0x080002bc       0x94 src/uart.o
-                0x080002bc                uart2_init
+                0x08000884       0x94 src/uart.o
+                0x08000884                uart2_init
  .text.uart2_write_char
-                0x08000350       0x30 src/uart.o
-                0x08000350                uart2_write_char
+                0x08000918       0x30 src/uart.o
+                0x08000918                uart2_write_char
  .text.uart2_read_char
-                0x08000380       0x28 src/uart.o
-                0x08000380                uart2_read_char
+                0x08000948       0x28 src/uart.o
+                0x08000948                uart2_read_char
  .text.Reset_Handler
-                0x080003a8       0x40 startup/startup.o
-                0x080003a8                Reset_Handler
+                0x08000970       0x40 startup/startup.o
+                0x08000970                Reset_Handler
  .text.Default_Handler
-                0x080003e8        0x4 startup/startup.o
-                0x080003e8                DebugMon_Handler
-                0x080003e8                HardFault_Handler
-                0x080003e8                SysTick_Handler
-                0x080003e8                PendSV_Handler
-                0x080003e8                NMI_Handler
-                0x080003e8                UsageFault_Handler
-                0x080003e8                Default_Handler
-                0x080003e8                MemManage_Handler
-                0x080003e8                SVC_Handler
-                0x080003e8                BusFault_Handler
+                0x080009b0        0x4 startup/startup.o
+                0x080009b0                DebugMon_Handler
+                0x080009b0                HardFault_Handler
+                0x080009b0                SysTick_Handler
+                0x080009b0                PendSV_Handler
+                0x080009b0                NMI_Handler
+                0x080009b0                UsageFault_Handler
+                0x080009b0                Default_Handler
+                0x080009b0                MemManage_Handler
+                0x080009b0                SVC_Handler
+                0x080009b0                BusFault_Handler
 
-.glue_7         0x080003ec        0x0
- .glue_7        0x080003ec        0x0 linker stubs
+.glue_7         0x080009b4        0x0
+ .glue_7        0x080009b4        0x0 linker stubs
 
-.glue_7t        0x080003ec        0x0
- .glue_7t       0x080003ec        0x0 linker stubs
+.glue_7t        0x080009b4        0x0
+ .glue_7t       0x080009b4        0x0 linker stubs
 
-.vfp11_veneer   0x080003ec        0x0
- .vfp11_veneer  0x080003ec        0x0 linker stubs
+.vfp11_veneer   0x080009b4        0x0
+ .vfp11_veneer  0x080009b4        0x0 linker stubs
 
-.v4_bx          0x080003ec        0x0
- .v4_bx         0x080003ec        0x0 linker stubs
+.v4_bx          0x080009b4        0x0
+ .v4_bx         0x080009b4        0x0 linker stubs
 
-.iplt           0x080003ec        0x0
- .iplt          0x080003ec        0x0 src/main.o
+.iplt           0x080009b4        0x0
+ .iplt          0x080009b4        0x0 src/main.o
 
-.rodata         0x080003ec       0x9a
+.rodata         0x080009b4       0xf2
  *(.rodata)
- .rodata        0x080003ec       0x9a src/main.o
+ .rodata        0x080009b4       0xe2 src/main.o
  *(.rodata.*)
-                0x08000486                        _sidata = LOADADDR (.data)
+ *fill*         0x08000a96        0x2 
+ .rodata.begin_prefix.0
+                0x08000a98        0xe src/main.o
+                0x08000aa6                        _sidata = LOADADDR (.data)
 
-.rel.dyn        0x08000488        0x0
- .rel.iplt      0x08000488        0x0 src/main.o
+.rel.dyn        0x08000aa8        0x0
+ .rel.iplt      0x08000aa8        0x0 src/main.o
 
-.data           0x20000000        0x0 load address 0x08000486
+.data           0x20000000        0x0 load address 0x08000aa6
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
                 0x20000000                        _edata = .
 
-.igot.plt       0x20000000        0x0 load address 0x08000486
+.igot.plt       0x20000000        0x0 load address 0x08000aa6
  .igot.plt      0x20000000        0x0 src/main.o
 
-.bss            0x20000000        0x0 load address 0x08000486
+.bss            0x20000000        0x0 load address 0x08000aa6
                 0x20000000                        _sbss = .
  *(.bss)
  *(.bss.*)
@@ -161,6 +170,10 @@ LOAD linker stubs
 .comment        0x00000000       0x1e
  .comment       0x00000000       0x1e src/main.o
                                  0x1f (size before relaxing)
+ .comment       0x0000001e        0x0 src/flash.o
+                                 0x1f (size before relaxing)
+ .comment       0x0000001e        0x0 src/image.o
+                                 0x1f (size before relaxing)
  .comment       0x0000001e        0x0 src/uart.o
                                  0x1f (size before relaxing)
 
@@ -169,6 +182,10 @@ LOAD linker stubs
  .ARM.attributes
                 0x00000000       0x2e src/main.o
  .ARM.attributes
-                0x0000002e       0x2e src/uart.o
+                0x0000002e       0x2e src/flash.o
  .ARM.attributes
-                0x0000005c       0x25 startup/startup.o
+                0x0000005c       0x2e src/image.o
+ .ARM.attributes
+                0x0000008a       0x2e src/uart.o
+ .ARM.attributes
+                0x000000b8       0x25 startup/startup.o
