@@ -1,112 +1,148 @@
-
 import serial
 import time
 import sys
+import zlib
 
 PORT = "/dev/ttyACM0"
 BAUD = 115200
-
 CHUNK_SIZE = 128
 TEST_SIZE = 256
 TIMEOUT = 5
 
 
 def read_response(ser):
-    response = ser.readline().decode(errors="replace").strip()
+    response = ser.readline().decode("ascii", errors="replace").strip()
     print("STM32:", response)
 
     if not response:
         raise TimeoutError("No response received from STM32")
 
+    if response.startswith("ERROR:"):
+        raise RuntimeError(response)
+
+    return response
+
+
+def expect_response(ser, expected):
+    response = read_response(ser)
+
+    if response != expected:
+        raise RuntimeError(
+            f"Expected {expected!r}, received {response!r}"
+        )
+
     return response
 
 
 def main():
-    if TEST_SIZE <= 0:
-        raise ValueError("TEST_SIZE must be greater than zero")
+    if not 0 < TEST_SIZE <= 491520:
+        raise ValueError("TEST_SIZE must be between 1 and 491520 bytes")
 
-    if CHUNK_SIZE <= 0:
-        raise ValueError("CHUNK_SIZE must be greater than zero")
+    if CHUNK_SIZE != 128:
+        raise ValueError("STM32 currently expects 128-byte chunks")
 
+    # Deterministic test pattern. This is NOT executable firmware.
+    pattern = bytes(range(256))
+    data = (pattern * ((TEST_SIZE + 255) // 256))[:TEST_SIZE]
+    expected_crc = zlib.crc32(data) & 0xFFFFFFFF
+
+    print(f"Image size: {len(data)} bytes")
+    print(f"CRC32: {expected_crc:08X}")
     print(f"Opening {PORT} at {BAUD} baud...")
 
+    ser = None
+
     try:
-        with serial.Serial(
-            PORT,
-            BAUD,
+        # Create the serial object without opening the port yet.
+        ser = serial.Serial(
+            port=None,
+            baudrate=BAUD,
             timeout=TIMEOUT,
             write_timeout=TIMEOUT,
-        ) as ser:
+        )
 
-            # Allow the serial connection to settle.
-            time.sleep(2)
-            ser.reset_input_buffer()
+        # Set modem-control lines before opening the port to avoid
+        # toggling DTR/RTS during port initialization.
+        ser.port = PORT
+        ser.dtr = False
+        ser.rts = False
+        ser.open()
 
-            print(f"Starting test transfer: {TEST_SIZE} bytes")
+        time.sleep(2)
+        ser.reset_input_buffer()
 
-            # Step 1: Request firmware update.
-            command = f"BEGIN_UPDATE {TEST_SIZE}\r\n"
-            ser.write(command.encode("ascii"))
+        command = f"BEGIN_UPDATE {len(data)} {expected_crc:08X}\r\n"
+        print("Host command:", command.strip())
+
+        ser.write(command.encode("ascii"))
+        ser.flush()
+
+        expect_response(ser, "PREPARING")
+        expect_response(ser, "READY")
+
+        for offset in range(0, len(data), CHUNK_SIZE):
+            chunk = data[offset:offset + CHUNK_SIZE]
+            ser.write(chunk)
             ser.flush()
 
-            # Step 2: Wait for the STM32 to prepare Flash.
-            response = read_response(ser)
+            expect_response(ser, "ACK")
+            print(f"Sent {offset + len(chunk)}/{len(data)} bytes")
 
-            if response != "PREPARING":
-                raise RuntimeError(
-                    f"Expected PREPARING, received {response!r}"
-                )
+        expected_line = read_response(ser)
+        actual_line = read_response(ser)
 
-            # Step 3: Wait until Flash erase has completed.
-            response = read_response(ser)
+        expected_prefix = "EXPECTED_CRC: "
+        actual_prefix = "ACTUAL_CRC: "
 
-            if response != "READY":
-                raise RuntimeError(
-                    f"Expected READY, received {response!r}"
-                )
+        if not expected_line.startswith(expected_prefix):
+            raise RuntimeError(
+                f"Expected CRC diagnostic, received {expected_line!r}"
+            )
 
-            # Step 4: Generate dummy binary data.
-            # This is NOT a valid STM32 application firmware image.
-            data = bytes(range(256)) * (TEST_SIZE // 256)
-            data = data[:TEST_SIZE]
+        if not actual_line.startswith(actual_prefix):
+            raise RuntimeError(
+                f"Expected actual CRC diagnostic, received {actual_line!r}"
+            )
 
-            # Step 5: Send chunks and wait for each ACK.
-            for offset in range(0, TEST_SIZE, CHUNK_SIZE):
-                chunk = data[offset:offset + CHUNK_SIZE]
+        device_expected = int(expected_line[len(expected_prefix):], 16)
+        device_actual = int(actual_line[len(actual_prefix):], 16)
 
-                ser.write(chunk)
-                ser.flush()
+        print(f"Host CRC:       {expected_crc:08X}")
+        print(f"STM32 expected: {device_expected:08X}")
+        print(f"STM32 actual:   {device_actual:08X}")
 
-                response = read_response(ser)
+        if device_expected != expected_crc:
+            raise RuntimeError(
+                "Host and STM32 expected CRC values differ"
+            )
 
-                if response != "ACK":
-                    raise RuntimeError(
-                        f"Expected ACK at offset {offset}, "
-                        f"received {response!r}"
-                    )
+        if device_actual != expected_crc:
+            # The bootloader normally sends CRC_MISMATCH next.
+            try:
+                read_response(ser)
+            except RuntimeError as exc:
+                if "CRC_MISMATCH" not in str(exc):
+                    raise
 
-                print(
-                    f"Sent {offset + len(chunk)}/{TEST_SIZE} bytes"
-                )
+            raise RuntimeError("CRC verification failed")
 
-            # Step 6: Confirm transfer completion.
-            response = read_response(ser)
+        expect_response(ser, "UPDATE_OK")
 
-            if response != "UPDATE_OK":
-                raise RuntimeError(
-                    f"Expected UPDATE_OK, received {response!r}"
-                )
+        print("\nCRC-32 verification passed.")
+        print("Dummy data was written; it is not firmware.")
 
-            print("\nUART transfer and Flash programming test passed.")
-            print("Note: dummy data was written, not valid firmware.")
-
-    except serial.SerialException as exc:
-        print(f"Serial error: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    except (RuntimeError, TimeoutError, ValueError) as exc:
+    except (
+        serial.SerialException,
+        RuntimeError,
+        TimeoutError,
+        ValueError,
+    ) as exc:
         print(f"Transfer failed: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    finally:
+        if ser is not None and ser.is_open:
+            ser.close()
 
 
 if __name__ == "__main__":

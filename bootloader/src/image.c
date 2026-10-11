@@ -1,60 +1,33 @@
+
+#include <stdint.h>
+
 #include "image.h"
 #include "flash.h"
-
-
-/* =========================
- * Application Flash limits
- * ========================= */
+#include "crc.h"
 
 #define APP_FLASH_START   0x08008000UL
 #define APP_FLASH_END     0x08080000UL
-
-
-/* =========================
- * Sector erase
- * ========================= */
 
 int image_erase(uint32_t address, uint32_t size)
 {
     uint32_t end;
     uint32_t sector;
 
-    /*
-     * Check starting address.
-     */
     if (address < APP_FLASH_START ||
-        address >= APP_FLASH_END)
+        address >= APP_FLASH_END ||
+        size == 0U)
     {
         return -1;
     }
 
-    /*
-     * Image must not be empty.
-     */
-    if (size == 0U)
-    {
-        return -1;
-    }
-
-    /*
-     * Calculate the end address.
-     */
     end = address + size;
 
-    /*
-     * Check for integer overflow
-     * and application Flash boundary.
-     */
     if (end < address || end > APP_FLASH_END)
     {
         return -1;
     }
 
-
-    /* =========================
-     * Determine first sector
-     * ========================= */
-
+    /* Find the first Flash sector touched by the image. */
     if (address < 0x0800C000UL)
     {
         sector = 2U;
@@ -80,21 +53,10 @@ int image_erase(uint32_t address, uint32_t size)
         sector = 7U;
     }
 
-
-    /* =========================
-     * Erase all sectors touched
-     * by the image
-     * ========================= */
-
     while (sector <= 7U)
     {
         uint32_t sector_start;
 
-
-        /*
-         * Get the starting address
-         * of the current sector.
-         */
         if (sector == 2U)
         {
             sector_start = 0x08008000UL;
@@ -120,26 +82,15 @@ int image_erase(uint32_t address, uint32_t size)
             sector_start = 0x08060000UL;
         }
 
-
-        /*
-         * If the current sector starts
-         * at or after the image end,
-         * the image does not touch it.
-         */
         if (sector_start >= end)
         {
             break;
         }
 
-
-        /*
-         * Erase the current sector.
-         */
         if (flash_erase_sector(sector) != 0)
         {
             return -1;
         }
-
 
         sector++;
     }
@@ -147,163 +98,97 @@ int image_erase(uint32_t address, uint32_t size)
     return 0;
 }
 
-
-/* =========================
- * Program firmware image
- * ========================= */
-
 int image_program(uint32_t address,
                   const uint8_t *data,
                   uint32_t size)
-
 {
-    uint32_t i;
-    uint32_t word;
-    uint32_t remaining;
+    uint32_t i = 0U;
 
-
-    /*
-     * Check that the starting address
-     * is inside application Flash.
-     */
     if (address < APP_FLASH_START ||
-        address >= APP_FLASH_END)
+        address >= APP_FLASH_END ||
+        size == 0U ||
+        size > (APP_FLASH_END - address))
     {
         return -1;
     }
 
-
-    /*
-     * Check that the image fits
-     * completely inside application Flash.
-     */
-    if (size > (APP_FLASH_END - address))
+    /* Program complete 32-bit words. */
+    for (; i + 4U <= size; i += 4U)
     {
-        return -1;
-    }
+        uint32_t word =
+            ((uint32_t)data[i]) |
+            ((uint32_t)data[i + 1U] << 8U) |
+            ((uint32_t)data[i + 2U] << 16U) |
+            ((uint32_t)data[i + 3U] << 24U);
 
-
-    /*
-     * Program complete 32-bit words.
-     *
-     * STM32F446 uses little-endian memory,
-     * so the first byte occupies the
-     * least significant byte.
-     */
-    for (i = 0U; i + 4U <= size; i += 4U)
-    {
-        word = ((uint32_t)data[i]) |
-               ((uint32_t)data[i + 1U] << 8) |
-               ((uint32_t)data[i + 2U] << 16) |
-               ((uint32_t)data[i + 3U] << 24);
-
-
-        /*
-         * Program one 32-bit word.
-         */
         if (flash_program_word(address + i, word) != 0)
         {
             return -1;
         }
     }
 
-
-    /*
-     * Handle remaining 1-3 bytes.
-     */
-    remaining = size - i;
-
-    if (remaining != 0U)
+    /* Program any remaining bytes, padded with erased 0xFF bytes. */
+    if (i < size)
     {
-        /*
-         * Start with an erased Flash word.
-         *
-         * Erased Flash = 0xFFFFFFFF.
-         */
-        word = 0xFFFFFFFFUL;
+        uint32_t word = 0xFFFFFFFFUL;
+        uint32_t remaining = size - i;
 
-
-        /*
-         * Insert the remaining bytes.
-         */
         for (uint32_t j = 0U; j < remaining; j++)
         {
-            word &= ~(0xFFUL << (8U * j));
-
-            word |= ((uint32_t)data[i + j])
-                    << (8U * j);
+            uint32_t shift = 8U * j;
+            word &= ~(0xFFUL << shift);
+            word |= ((uint32_t)data[i + j] << shift);
         }
 
-
-        /*
-         * Program the final word.
-         */
         if (flash_program_word(address + i, word) != 0)
         {
             return -1;
         }
     }
-
 
     return 0;
 }
 
-
-
-/* =========================
-
-* Verify firmware image
-* ========================= */
-
 int image_verify(uint32_t address,
-const uint8_t *data,
-uint32_t size)
+                 const uint8_t *data,
+                 uint32_t size)
 {
-uint32_t i;
-volatile const uint8_t *flash_data;
+    volatile const uint8_t *flash_data;
 
-
-/*
- * Check starting address.
- */
-if (address < APP_FLASH_START ||
-    address >= APP_FLASH_END)
-{
-    return -1;
-}
-
-/*
- * Check image size.
- */
-if (size == 0U ||
-    size > (APP_FLASH_END - address))
-{
-    return -1;
-}
-
-/*
- * Point to the firmware stored in Flash.
- *
- * STM32 memory-maps internal Flash,
- * so we can read it like normal memory.
- */
-flash_data = (volatile const uint8_t *)address;
-
-/*
- * Compare every image byte.
- */
-for (i = 0U; i < size; i++)
-{
-    if (flash_data[i] != data[i])
+    if (address < APP_FLASH_START ||
+        address >= APP_FLASH_END ||
+        size == 0U ||
+        size > (APP_FLASH_END - address))
     {
         return -1;
     }
+
+    flash_data = (volatile const uint8_t *)address;
+
+    for (uint32_t i = 0U; i < size; i++)
+    {
+        if (flash_data[i] != data[i])
+        {
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
-/*
- * Every byte matched.
- */
-return 0;
+uint32_t image_crc32(uint32_t address, uint32_t size)
+{
+    volatile const uint8_t *flash_data;
 
+    if (address < APP_FLASH_START ||
+        address >= APP_FLASH_END ||
+        size == 0U ||
+        size > (APP_FLASH_END - address))
+    {
+        return 0U;
+    }
 
+    flash_data = (volatile const uint8_t *)address;
+
+    return crc32_calculate((const uint8_t *)flash_data, size);
 }

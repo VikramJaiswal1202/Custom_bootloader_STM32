@@ -5,28 +5,46 @@
 #include "flash.h"
 #include "image.h"
 
-/* Application Flash layout */
-#define APP_START_ADDRESS   0x08008000UL
-#define FLASH_END_ADDRESS  0x08080000UL
-#define MAX_APP_SIZE       (FLASH_END_ADDRESS - APP_START_ADDRESS)
+#define APP_START_ADDRESS    0x08008000UL
+#define FLASH_END_ADDRESS    0x08080000UL
+#define MAX_APP_SIZE         (FLASH_END_ADDRESS - APP_START_ADDRESS)
 
-/* UART protocol */
-#define CMD_BUFFER_SIZE     32U
-#define TRANSFER_CHUNK_SIZE 128U
+#define CMD_BUFFER_SIZE      32U
+#define TRANSFER_CHUNK_SIZE  128U
 
 static void uart_write_string(const char *str)
 {
     while (*str != '\0')
     {
-        uart2_write_char((uint8_t)*str);
-        str++;
+        uart2_write_char((uint8_t)*str++);
     }
 }
 
-/*
- * Compare a programmed Flash chunk with the received bytes.
- * Returns 0 on success, -1 on mismatch or invalid range.
- */
+static void debug_print_command(const char *command)
+{
+    uart_write_string("CMD=[");
+
+    while (*command != '\0')
+    {
+        uart2_write_char((uint8_t)*command++);
+    }
+
+    uart_write_string("]\r\n");
+}
+
+static void uart_write_hex32(uint32_t value)
+{
+    static const char hex[] = "0123456789ABCDEF";
+
+    for (int i = 7; i >= 0; i--)
+    {
+        uint8_t digit = (uint8_t)((value >> (i * 4)) & 0x0FU);
+        uart2_write_char((uint8_t)hex[digit]);
+    }
+
+    uart_write_string("\r\n");
+}
+
 static int verify_chunk(uint32_t address,
                         const uint8_t *data,
                         uint32_t size)
@@ -54,26 +72,89 @@ static int verify_chunk(uint32_t address,
     return 0;
 }
 
+/* Parse a decimal image size. Returns zero if invalid. */
+static uint32_t parse_size(const char *str)
+{
+    uint32_t value = 0U;
+
+    if (*str == '\0')
+    {
+        return 0U;
+    }
+
+    while (*str != '\0')
+    {
+        uint32_t digit;
+
+        if (*str < '0' || *str > '9')
+        {
+            return 0U;
+        }
+
+        digit = (uint32_t)(*str - '0');
+
+        /* Prevent overflow and reject sizes beyond Flash capacity. */
+        if (value > (MAX_APP_SIZE - digit) / 10U)
+        {
+            return 0U;
+        }
+
+        value = (value * 10U) + digit;
+        str++;
+    }
+
+    return value;
+}
+
 /*
- * Receive firmware over UART and program it into Flash.
- *
- * Protocol:
- *   PREPARING
- *   READY
- *   [128-byte data chunk] -> ACK
- *   ...
- *   UPDATE_OK
+ * Parse exactly eight hexadecimal characters.
+ * Returns zero on success and -1 on failure.
  */
-static void receive_firmware(uint32_t size)
+static int parse_crc32(const char *str, uint32_t *result)
+{
+    uint32_t value = 0U;
+
+    for (uint32_t i = 0U; i < 8U; i++)
+    {
+        char c = str[i];
+        uint32_t digit;
+
+        if (c >= '0' && c <= '9')
+        {
+            digit = (uint32_t)(c - '0');
+        }
+        else if (c >= 'A' && c <= 'F')
+        {
+            digit = (uint32_t)(c - 'A') + 10U;
+        }
+        else if (c >= 'a' && c <= 'f')
+        {
+            digit = (uint32_t)(c - 'a') + 10U;
+        }
+        else
+        {
+            return -1;
+        }
+
+        value = (value << 4U) | digit;
+    }
+
+    if (str[8] != '\0')
+    {
+        return -1;
+    }
+
+    *result = value;
+    return 0;
+}
+
+static void receive_firmware(uint32_t size, uint32_t expected_crc)
 {
     uint8_t buffer[TRANSFER_CHUNK_SIZE];
     uint32_t received = 0U;
 
     uart_write_string("PREPARING\r\n");
 
-    /*
-     * Erase the Flash sectors occupied by the new image.
-     */
     flash_unlock();
 
     if (image_erase(APP_START_ADDRESS, size) != 0)
@@ -94,17 +175,13 @@ static void receive_firmware(uint32_t size)
             chunk_size = TRANSFER_CHUNK_SIZE;
         }
 
-        /*
-         * Receive one chunk.
-         */
+        /* Receive one complete chunk. */
         for (uint32_t i = 0U; i < chunk_size; i++)
         {
             buffer[i] = uart2_read_char();
         }
 
-        /*
-         * Program the chunk into application Flash.
-         */
+        /* Program this chunk into application Flash. */
         if (image_program(APP_START_ADDRESS + received,
                           buffer,
                           chunk_size) != 0)
@@ -114,9 +191,7 @@ static void receive_firmware(uint32_t size)
             return;
         }
 
-        /*
-         * Read the programmed bytes back and compare them.
-         */
+        /* Read the programmed bytes back and compare. */
         if (verify_chunk(APP_START_ADDRESS + received,
                          buffer,
                          chunk_size) != 0)
@@ -127,108 +202,115 @@ static void receive_firmware(uint32_t size)
         }
 
         received += chunk_size;
-
         uart_write_string("ACK\r\n");
     }
 
-    /*
-     * All chunks were programmed and read-back verified.
-     */
     flash_lock();
+
+    /* Verify the complete image using CRC-32. */
+    uint32_t actual_crc = image_crc32(APP_START_ADDRESS, size);
+
+    uart_write_string("EXPECTED_CRC: ");
+    uart_write_hex32(expected_crc);
+
+    uart_write_string("ACTUAL_CRC: ");
+    uart_write_hex32(actual_crc);
+
+    if (actual_crc != expected_crc)
+    {
+        uart_write_string("ERROR: CRC_MISMATCH\r\n");
+        return;
+    }
 
     uart_write_string("UPDATE_OK\r\n");
 }
 
-/*
- * Parse a positive decimal integer.
- * Returns 0 for invalid input.
- */
-static uint32_t parse_size(const char *str)
-{
-    uint32_t value = 0U;
-
-    if (*str == '\0')
-    {
-        return 0U;
-    }
-
-    while (*str != '\0')
-    {
-        if (*str < '0' || *str > '9')
-        {
-            return 0U;
-        }
-
-        uint32_t digit = (uint32_t)(*str - '0');
-
-        if (value > (MAX_APP_SIZE - digit) / 10U)
-        {
-            return 0U;
-        }
-
-        value = (value * 10U) + digit;
-        str++;
-    }
-
-    return value;
-}
-
 static void process_command(char *command)
 {
-    static const char begin_prefix[] = "BEGIN_UPDATE ";
+    static const char info[] = "GET_INFO";
+    static const char prefix[] = "BEGIN_UPDATE ";
 
-    /*
-     * GET_INFO command.
-     */
-    if (command[0] == 'G' &&
-        command[1] == 'E' &&
-        command[2] == 'T' &&
-        command[3] == '_' &&
-        command[4] == 'I' &&
-        command[5] == 'N' &&
-        command[6] == 'F' &&
-        command[7] == 'O' &&
-        command[8] == '\0')
+    uint32_t i = 0U;
+
+    /* Handle GET_INFO. */
+    while (info[i] != '\0' && command[i] == info[i])
+    {
+        i++;
+    }
+
+    if (info[i] == '\0' && command[i] == '\0')
     {
         uart_write_string("BOOTLOADER_OK\r\n");
         return;
     }
 
-    /*
-     * BEGIN_UPDATE <size> command.
-     */
-    uint32_t i = 0U;
+    /* Check the complete BEGIN_UPDATE prefix. */
+    i = 0U;
 
-    while (begin_prefix[i] != '\0' &&
-           command[i] == begin_prefix[i])
+    while (prefix[i] != '\0' && command[i] == prefix[i])
     {
         i++;
     }
 
-    if (begin_prefix[i] == '\0')
+    if (prefix[i] != '\0')
     {
-        uint32_t size = parse_size(&command[i]);
-
-        if (size == 0U || size > MAX_APP_SIZE)
-        {
-            uart_write_string("ERROR: INVALID_SIZE\r\n");
-            return;
-        }
-
-        receive_firmware(size);
+        uart_write_string("ERROR: UNKNOWN_COMMAND\r\n");
         return;
     }
 
-    uart_write_string("ERROR: UNKNOWN_COMMAND\r\n");
+    /*
+     * command[i] now points to the image size.
+     * Expected format: BEGIN_UPDATE <size> <8-digit CRC>
+     */
+    char *size_str = &command[i];
+    char *separator = size_str;
+
+    while (*separator != '\0' && *separator != ' ')
+    {
+        separator++;
+    }
+
+    if (*separator != ' ')
+    {
+        uart_write_string("ERROR: INVALID_COMMAND\r\n");
+        return;
+    }
+
+    *separator = '\0';
+    char *crc_str = separator + 1;
+
+    /* Reject an empty CRC or extra spaces. */
+    if (*crc_str == '\0' || *crc_str == ' ')
+    {
+        uart_write_string("ERROR: INVALID_CRC\r\n");
+        return;
+    }
+
+    uint32_t size = parse_size(size_str);
+    uint32_t expected_crc;
+
+    if (size == 0U || size > MAX_APP_SIZE)
+    {
+        uart_write_string("ERROR: INVALID_SIZE\r\n");
+        return;
+    }
+
+    if (parse_crc32(crc_str, &expected_crc) != 0)
+    {
+        uart_write_string("ERROR: INVALID_CRC\r\n");
+        return;
+    }
+
+    receive_firmware(size, expected_crc);
 }
 
 int main(void)
 {
+    
     char command[CMD_BUFFER_SIZE];
     uint32_t index = 0U;
 
     uart2_init();
-
     uart_write_string("BOOTLOADER_OK\r\n");
 
     while (1)
@@ -240,21 +322,19 @@ int main(void)
             if (index > 0U)
             {
                 command[index] = '\0';
+                debug_print_command(command);
                 process_command(command);
                 index = 0U;
             }
         }
+        else if (index < CMD_BUFFER_SIZE - 1U)
+        {
+            command[index++] = (char)ch;
+        }
         else
         {
-            if (index < (CMD_BUFFER_SIZE - 1U))
-            {
-                command[index++] = (char)ch;
-            }
-            else
-            {
-                index = 0U;
-                uart_write_string("ERROR: COMMAND_TOO_LONG\r\n");
-            }
+            index = 0U;
+            uart_write_string("ERROR: COMMAND_TOO_LONG\r\n");
         }
     }
 }
