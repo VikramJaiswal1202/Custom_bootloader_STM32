@@ -31,67 +31,84 @@ LOAD src/startup.o
                 0x08008080                        . = ALIGN (0x80)
  *fill*         0x08008040       0x40 
 
-.text           0x08008080       0xa0
+.text           0x08008080      0x2f8
  *(.text)
  *(.text.*)
- .text.main     0x08008080       0x5c src/main.o
-                0x08008080                main
+ .text.uart2_init
+                0x08008080       0x94 src/main.o
+ .text.uart2_write_char
+                0x08008114       0x30 src/main.o
+ .text.uart2_write_string
+                0x08008144       0x2c src/main.o
+ .text.strings_equal
+                0x08008170       0x58 src/main.o
+ .text.process_command
+                0x080081c8       0x4c src/main.o
+ .text.uart2_poll_command
+                0x08008214       0x88 src/main.o
+ .text.main     0x0800829c       0x98 src/main.o
+                0x0800829c                main
  .text.Reset_Handler
-                0x080080dc       0x40 src/startup.o
-                0x080080dc                Reset_Handler
+                0x08008334       0x40 src/startup.o
+                0x08008334                Reset_Handler
  .text.Default_Handler
-                0x0800811c        0x4 src/startup.o
-                0x0800811c                DebugMon_Handler
-                0x0800811c                HardFault_Handler
-                0x0800811c                SysTick_Handler
-                0x0800811c                PendSV_Handler
-                0x0800811c                NMI_Handler
-                0x0800811c                UsageFault_Handler
-                0x0800811c                Default_Handler
-                0x0800811c                MemManage_Handler
-                0x0800811c                SVC_Handler
-                0x0800811c                BusFault_Handler
+                0x08008374        0x4 src/startup.o
+                0x08008374                DebugMon_Handler
+                0x08008374                HardFault_Handler
+                0x08008374                SysTick_Handler
+                0x08008374                PendSV_Handler
+                0x08008374                NMI_Handler
+                0x08008374                UsageFault_Handler
+                0x08008374                Default_Handler
+                0x08008374                MemManage_Handler
+                0x08008374                SVC_Handler
+                0x08008374                BusFault_Handler
 
-.glue_7         0x08008120        0x0
- .glue_7        0x08008120        0x0 linker stubs
+.glue_7         0x08008378        0x0
+ .glue_7        0x08008378        0x0 linker stubs
 
-.glue_7t        0x08008120        0x0
- .glue_7t       0x08008120        0x0 linker stubs
+.glue_7t        0x08008378        0x0
+ .glue_7t       0x08008378        0x0 linker stubs
 
-.vfp11_veneer   0x08008120        0x0
- .vfp11_veneer  0x08008120        0x0 linker stubs
+.vfp11_veneer   0x08008378        0x0
+ .vfp11_veneer  0x08008378        0x0 linker stubs
 
-.v4_bx          0x08008120        0x0
- .v4_bx         0x08008120        0x0 linker stubs
+.v4_bx          0x08008378        0x0
+ .v4_bx         0x08008378        0x0 linker stubs
 
-.iplt           0x08008120        0x0
- .iplt          0x08008120        0x0 src/startup.o
+.iplt           0x08008378        0x0
+ .iplt          0x08008378        0x0 src/main.o
 
-.rel.dyn        0x08008120        0x0
- .rel.iplt      0x08008120        0x0 src/startup.o
-
-.rodata
+.rodata         0x08008378       0xa4
  *(.rodata)
+ .rodata        0x08008378       0xa4 src/main.o
  *(.rodata.*)
-                0x08008120                        _sidata = LOADADDR (.data)
+                0x0800841c                        _sidata = LOADADDR (.data)
 
-.data           0x20000000        0x0 load address 0x08008120
+.rel.dyn        0x0800841c        0x0
+ .rel.iplt      0x0800841c        0x0 src/main.o
+
+.data           0x20000000        0x0 load address 0x0800841c
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
                 0x20000000                        _edata = .
 
-.igot.plt       0x20000000        0x0 load address 0x08008120
- .igot.plt      0x20000000        0x0 src/startup.o
+.igot.plt       0x20000000        0x0 load address 0x0800841c
+ .igot.plt      0x20000000        0x0 src/main.o
 
-.bss            0x20000000        0x0 load address 0x08008120
+.bss            0x20000000       0x24 load address 0x0800841c
                 0x20000000                        _sbss = .
  *(.bss)
  *(.bss.*)
+ .bss.command_buffer
+                0x20000000       0x20 src/main.o
+ .bss.command_index
+                0x20000020        0x4 src/main.o
  *(COMMON)
-                0x20000000                        _ebss = .
-                0x20000000                        . = ALIGN (0x8)
-                0x20000000                        _end = .
+                0x20000024                        _ebss = .
+                0x20000028                        . = ALIGN (0x8)
+                0x20000028                        _end = .
 OUTPUT(application.elf elf32-littlearm)
 LOAD linker stubs
 

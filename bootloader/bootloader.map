@@ -31,11 +31,9 @@ Discarded input sections
  .text          0x00000000        0x0 src/crc.o
  .data          0x00000000        0x0 src/crc.o
  .bss           0x00000000        0x0 src/crc.o
- .text.crc32_calculate
-                0x00000000       0x74 src/crc.o
- .comment       0x00000000       0x1f src/crc.o
- .ARM.attributes
-                0x00000000       0x2e src/crc.o
+ .text          0x00000000        0x0 src/boot.o
+ .data          0x00000000        0x0 src/boot.o
+ .bss           0x00000000        0x0 src/boot.o
  .text          0x00000000        0x0 startup/startup.o
  .data          0x00000000        0x0 startup/startup.o
  .bss           0x00000000        0x0 startup/startup.o
@@ -55,6 +53,7 @@ LOAD src/image.o
 LOAD src/app.o
 LOAD src/uart.o
 LOAD src/crc.o
+LOAD src/boot.o
 LOAD startup/startup.o
                 0x20020000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
 
@@ -65,7 +64,7 @@ LOAD startup/startup.o
                 0x08000080                        . = ALIGN (0x80)
  *fill*         0x08000040       0x40 
 
-.text           0x08000080      0xbb0
+.text           0x08000080      0xdbc
  *(.text)
  *(.text.*)
  .text.uart_write_string
@@ -82,112 +81,123 @@ LOAD startup/startup.o
  .text.parse_crc32
                 0x08000234       0x98 src/main.o
  .text.receive_firmware
-                0x080002cc      0x174 src/main.o
+                0x080002cc      0x1d4 src/main.o
  .text.process_command
-                0x08000440      0x150 src/main.o
- .text.main     0x08000590       0x84 src/main.o
-                0x08000590                main
+                0x080004a0      0x1b4 src/main.o
+ .text.main     0x08000654       0x84 src/main.o
+                0x08000654                main
  .text.flash_unlock
-                0x08000614       0x30 src/flash.o
-                0x08000614                flash_unlock
+                0x080006d8       0x30 src/flash.o
+                0x080006d8                flash_unlock
  .text.flash_lock
-                0x08000644       0x1c src/flash.o
-                0x08000644                flash_lock
+                0x08000708       0x1c src/flash.o
+                0x08000708                flash_lock
  .text.flash_wait_ready
-                0x08000660       0x20 src/flash.o
-                0x08000660                flash_wait_ready
+                0x08000724       0x20 src/flash.o
+                0x08000724                flash_wait_ready
  .text.flash_has_error
-                0x08000680       0x24 src/flash.o
-                0x08000680                flash_has_error
+                0x08000744       0x24 src/flash.o
+                0x08000744                flash_has_error
  .text.flash_erase_sector
-                0x080006a4       0x98 src/flash.o
-                0x080006a4                flash_erase_sector
+                0x08000768       0x98 src/flash.o
+                0x08000768                flash_erase_sector
  .text.flash_program_word
-                0x0800073c       0xc0 src/flash.o
-                0x0800073c                flash_program_word
+                0x08000800       0xc0 src/flash.o
+                0x08000800                flash_program_word
  .text.image_erase
-                0x080007fc      0x134 src/image.o
-                0x080007fc                image_erase
+                0x080008c0      0x134 src/image.o
+                0x080008c0                image_erase
  .text.image_program
-                0x08000930      0x124 src/image.o
-                0x08000930                image_program
+                0x080009f4      0x124 src/image.o
+                0x080009f4                image_program
  .text.image_crc32
-                0x08000a54       0xac src/image.o
-                0x08000a54                image_crc32
+                0x08000b18       0x54 src/image.o
+                0x08000b18                image_crc32
  .text.uart2_init
-                0x08000b00       0x94 src/uart.o
-                0x08000b00                uart2_init
+                0x08000b6c       0x94 src/uart.o
+                0x08000b6c                uart2_init
  .text.uart2_write_char
-                0x08000b94       0x30 src/uart.o
-                0x08000b94                uart2_write_char
+                0x08000c00       0x30 src/uart.o
+                0x08000c00                uart2_write_char
  .text.uart2_read_char
-                0x08000bc4       0x28 src/uart.o
-                0x08000bc4                uart2_read_char
+                0x08000c30       0x28 src/uart.o
+                0x08000c30                uart2_read_char
+ .text.crc32_calculate
+                0x08000c58       0x74 src/crc.o
+                0x08000c58                crc32_calculate
+ .text.boot_validate_application
+                0x08000ccc       0x7c src/boot.o
+                0x08000ccc                boot_validate_application
+ .text.boot_jump_to_application
+                0x08000d48       0xb0 src/boot.o
+                0x08000d48                boot_jump_to_application
  .text.Reset_Handler
-                0x08000bec       0x40 startup/startup.o
-                0x08000bec                Reset_Handler
+                0x08000df8       0x40 startup/startup.o
+                0x08000df8                Reset_Handler
  .text.Default_Handler
-                0x08000c2c        0x4 startup/startup.o
-                0x08000c2c                DebugMon_Handler
-                0x08000c2c                HardFault_Handler
-                0x08000c2c                SysTick_Handler
-                0x08000c2c                PendSV_Handler
-                0x08000c2c                NMI_Handler
-                0x08000c2c                UsageFault_Handler
-                0x08000c2c                Default_Handler
-                0x08000c2c                MemManage_Handler
-                0x08000c2c                SVC_Handler
-                0x08000c2c                BusFault_Handler
+                0x08000e38        0x4 startup/startup.o
+                0x08000e38                DebugMon_Handler
+                0x08000e38                HardFault_Handler
+                0x08000e38                SysTick_Handler
+                0x08000e38                PendSV_Handler
+                0x08000e38                NMI_Handler
+                0x08000e38                UsageFault_Handler
+                0x08000e38                Default_Handler
+                0x08000e38                MemManage_Handler
+                0x08000e38                SVC_Handler
+                0x08000e38                BusFault_Handler
 
-.glue_7         0x08000c30        0x0
- .glue_7        0x08000c30        0x0 linker stubs
+.glue_7         0x08000e3c        0x0
+ .glue_7        0x08000e3c        0x0 linker stubs
 
-.glue_7t        0x08000c30        0x0
- .glue_7t       0x08000c30        0x0 linker stubs
+.glue_7t        0x08000e3c        0x0
+ .glue_7t       0x08000e3c        0x0 linker stubs
 
-.vfp11_veneer   0x08000c30        0x0
- .vfp11_veneer  0x08000c30        0x0 linker stubs
+.vfp11_veneer   0x08000e3c        0x0
+ .vfp11_veneer  0x08000e3c        0x0 linker stubs
 
-.v4_bx          0x08000c30        0x0
- .v4_bx         0x08000c30        0x0 linker stubs
+.v4_bx          0x08000e3c        0x0
+ .v4_bx         0x08000e3c        0x0 linker stubs
 
-.iplt           0x08000c30        0x0
- .iplt          0x08000c30        0x0 src/main.o
+.iplt           0x08000e3c        0x0
+ .iplt          0x08000e3c        0x0 src/main.o
 
-.rodata         0x08000c30      0x18e
+.rodata         0x08000e3c      0x21a
  *(.rodata)
- .rodata        0x08000c30      0x15e src/main.o
+ .rodata        0x08000e3c      0x1ea src/main.o
  *(.rodata.*)
- *fill*         0x08000d8e        0x2 
- .rodata.hex.2  0x08000d90       0x11 src/main.o
- *fill*         0x08000da1        0x3 
+ *fill*         0x08001026        0x2 
+ .rodata.hex.2  0x08001028       0x11 src/main.o
+ *fill*         0x08001039        0x3 
  .rodata.info.1
-                0x08000da4        0x9 src/main.o
- *fill*         0x08000dad        0x3 
+                0x0800103c        0x9 src/main.o
+ *fill*         0x08001045        0x3 
  .rodata.prefix.0
-                0x08000db0        0xe src/main.o
-                0x08000dbe                        _sidata = LOADADDR (.data)
+                0x08001048        0xe src/main.o
+                0x08001056                        _sidata = LOADADDR (.data)
 
-.rel.dyn        0x08000dc0        0x0
- .rel.iplt      0x08000dc0        0x0 src/main.o
+.rel.dyn        0x08001058        0x0
+ .rel.iplt      0x08001058        0x0 src/main.o
 
-.data           0x20000000        0x0 load address 0x08000dbe
+.data           0x20000000        0x0 load address 0x08001056
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
                 0x20000000                        _edata = .
 
-.igot.plt       0x20000000        0x0 load address 0x08000dbe
+.igot.plt       0x20000000        0x0 load address 0x08001056
  .igot.plt      0x20000000        0x0 src/main.o
 
-.bss            0x20000000        0x0 load address 0x08000dbe
+.bss            0x20000000        0x1 load address 0x08001056
                 0x20000000                        _sbss = .
  *(.bss)
  *(.bss.*)
+ .bss.application_verified
+                0x20000000        0x1 src/main.o
  *(COMMON)
-                0x20000000                        _ebss = .
-                0x20000000                        . = ALIGN (0x8)
-                0x20000000                        _end = .
+                0x20000001                        _ebss = .
+                0x20000008                        . = ALIGN (0x8)
+                0x20000008                        _end = .
 OUTPUT(bootloader.elf elf32-littlearm)
 LOAD linker stubs
 
@@ -199,6 +209,10 @@ LOAD linker stubs
  .comment       0x0000001e        0x0 src/image.o
                                  0x1f (size before relaxing)
  .comment       0x0000001e        0x0 src/uart.o
+                                 0x1f (size before relaxing)
+ .comment       0x0000001e        0x0 src/crc.o
+                                 0x1f (size before relaxing)
+ .comment       0x0000001e        0x0 src/boot.o
                                  0x1f (size before relaxing)
 
 .ARM.attributes
@@ -212,4 +226,8 @@ LOAD linker stubs
  .ARM.attributes
                 0x0000008a       0x2e src/uart.o
  .ARM.attributes
-                0x000000b8       0x25 startup/startup.o
+                0x000000b8       0x2e src/crc.o
+ .ARM.attributes
+                0x000000e6       0x2e src/boot.o
+ .ARM.attributes
+                0x00000114       0x25 startup/startup.o

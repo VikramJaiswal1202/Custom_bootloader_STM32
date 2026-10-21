@@ -1,9 +1,12 @@
 
 #include <stdint.h>
-
+#include "boot.h"
 #include "uart.h"
 #include "flash.h"
 #include "image.h"
+
+#define USART2_STATUS_REG (*(volatile uint32_t *)0x40004400UL)
+#define USART_SR_TC       (1U << 6)
 
 #define APP_START_ADDRESS    0x08008000UL
 #define FLASH_END_ADDRESS    0x08080000UL
@@ -11,6 +14,7 @@
 
 #define CMD_BUFFER_SIZE      32U
 #define TRANSFER_CHUNK_SIZE  128U
+static uint8_t application_verified = 0U;
 
 static void uart_write_string(const char *str)
 {
@@ -150,6 +154,7 @@ static int parse_crc32(const char *str, uint32_t *result)
 
 static void receive_firmware(uint32_t size, uint32_t expected_crc)
 {
+    application_verified = 0U;
     uint8_t buffer[TRANSFER_CHUNK_SIZE];
     uint32_t received = 0U;
 
@@ -216,13 +221,37 @@ static void receive_firmware(uint32_t size, uint32_t expected_crc)
     uart_write_string("ACTUAL_CRC: ");
     uart_write_hex32(actual_crc);
 
-    if (actual_crc != expected_crc)
-    {
-        uart_write_string("ERROR: CRC_MISMATCH\r\n");
-        return;
-    }
+if (actual_crc != expected_crc)
+{
+    uart_write_string("ERROR: CRC_MISMATCH\r\n");
+    return;
+}
 
-    uart_write_string("UPDATE_OK\r\n");
+if (boot_validate_application() != 0)
+{
+    uart_write_string("ERROR: INVALID_APPLICATION\r\n");
+    return;
+}
+
+application_verified = 1U;
+
+/* Tell the host that the firmware update succeeded. */
+uart_write_string("UPDATE_OK\r\n");
+
+/* Wait until the final response has physically transmitted. */
+while ((USART2_STATUS_REG & USART_SR_TC) == 0U)
+{
+}
+uart_write_string("AUTO_BOOT: JUMPING\r\n");
+
+/* Wait for the diagnostic message to finish transmitting. */
+while ((USART2_STATUS_REG & USART_SR_TC) == 0U)
+{
+}
+
+boot_jump_to_application();
+
+uart_write_string("ERROR: BOOT_RETURNED\r\n");
 }
 
 static void process_command(char *command)
@@ -243,6 +272,25 @@ static void process_command(char *command)
         uart_write_string("BOOTLOADER_OK\r\n");
         return;
     }
+    if (command[0] == 'B' &&
+    command[1] == 'O' &&
+    command[2] == 'O' &&
+    command[3] == 'T' &&
+    command[4] == '\0')
+{
+    if (application_verified == 0U)
+    {
+        uart_write_string("ERROR: APPLICATION_NOT_VERIFIED\r\n");
+        return;
+    }
+
+    uart_write_string("BOOTING_APPLICATION\r\n");
+    boot_jump_to_application();
+
+    /* Reached only if the jump routine returns. */
+    uart_write_string("ERROR: BOOT_RETURNED\r\n");
+    return;
+}
 
     /* Check the complete BEGIN_UPDATE prefix. */
     i = 0U;
