@@ -10,28 +10,50 @@ TEST_SIZE = 256
 TIMEOUT = 5
 
 
-def read_response(ser):
-    response = ser.readline().decode("ascii", errors="replace").strip()
-    print("STM32:", response)
+def read_line(ser):
+    """Read one newline-terminated line and return stripped text."""
+    raw = ser.readline()
 
-    if not response:
+    if not raw:
         raise TimeoutError("No response received from STM32")
 
-    if response.startswith("ERROR:"):
-        raise RuntimeError(response)
-
+    response = raw.decode("ascii", errors="replace").strip()
+    print("STM32:", response)
     return response
 
 
-def expect_response(ser, expected):
-    response = read_response(ser)
+def read_expected(ser, expected, ignore_debug=True):
+    """
+    Wait for an expected protocol response.
+    Ignore CMD=[...] debug lines, but surface errors and unexpected lines.
+    """
+    deadline = time.monotonic() + TIMEOUT
 
-    if response != expected:
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        ser.timeout = max(0.1, remaining)
+
+        try:
+            response = read_line(ser)
+        except TimeoutError:
+            break
+
+        if ignore_debug and response.startswith("CMD=["):
+            continue
+
+        if response.startswith("ERROR:"):
+            raise RuntimeError(response)
+
+        if response == expected:
+            return response
+
         raise RuntimeError(
             f"Expected {expected!r}, received {response!r}"
         )
 
-    return response
+    raise TimeoutError(
+        f"Timed out waiting for {expected!r} from STM32"
+    )
 
 
 def main():
@@ -53,43 +75,37 @@ def main():
     ser = None
 
     try:
-        # Create the serial object without opening the port yet.
+        # Match the simple diagnostic that successfully received GET_INFO.
+        # Use normal pyserial port initialization.
         ser = serial.Serial(
-            port=None,
-            baudrate=BAUD,
+            PORT,
+            BAUD,
             timeout=TIMEOUT,
             write_timeout=TIMEOUT,
         )
 
-        # Set modem-control lines before opening the port to avoid
-        # toggling DTR/RTS during port initialization.
-        ser.port = PORT
-        ser.dtr = False
-        ser.rts = False
-        ser.open()
-
+        # Allow the port/board to settle, then discard stale startup output.
         time.sleep(2)
         ser.reset_input_buffer()
 
-        command = f"BEGIN_UPDATE {len(data)} {expected_crc:08X}\r\n"
+        command = f"BEGIN_UPDATE {len(data)} {expected_crc:08X}\r"
         print("Host command:", command.strip())
-
         ser.write(command.encode("ascii"))
         ser.flush()
 
-        expect_response(ser, "PREPARING")
-        expect_response(ser, "READY")
+        read_expected(ser, "PREPARING")
+        read_expected(ser, "READY")
 
         for offset in range(0, len(data), CHUNK_SIZE):
             chunk = data[offset:offset + CHUNK_SIZE]
             ser.write(chunk)
             ser.flush()
 
-            expect_response(ser, "ACK")
+            read_expected(ser, "ACK")
             print(f"Sent {offset + len(chunk)}/{len(data)} bytes")
 
-        expected_line = read_response(ser)
-        actual_line = read_response(ser)
+        expected_line = read_line(ser)
+        actual_line = read_line(ser)
 
         expected_prefix = "EXPECTED_CRC: "
         actual_prefix = "ACTUAL_CRC: "
@@ -112,22 +128,21 @@ def main():
         print(f"STM32 actual:   {device_actual:08X}")
 
         if device_expected != expected_crc:
-            raise RuntimeError(
-                "Host and STM32 expected CRC values differ"
-            )
+            raise RuntimeError("Host and STM32 expected CRC values differ")
 
         if device_actual != expected_crc:
-            # The bootloader normally sends CRC_MISMATCH next.
+            # The bootloader normally sends ERROR: CRC_MISMATCH next.
             try:
-                read_response(ser)
-            except RuntimeError as exc:
-                if "CRC_MISMATCH" not in str(exc):
-                    raise
-
+                response = read_line(ser)
+                if "CRC_MISMATCH" not in response:
+                    raise RuntimeError(
+                        f"Expected CRC_MISMATCH, received {response!r}"
+                    )
+            except TimeoutError:
+                pass
             raise RuntimeError("CRC verification failed")
 
-        expect_response(ser, "UPDATE_OK")
-
+        read_expected(ser, "UPDATE_OK")
         print("\nCRC-32 verification passed.")
         print("Dummy data was written; it is not firmware.")
 

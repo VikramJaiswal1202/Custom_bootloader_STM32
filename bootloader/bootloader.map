@@ -31,6 +31,11 @@ Discarded input sections
  .text          0x00000000        0x0 src/crc.o
  .data          0x00000000        0x0 src/crc.o
  .bss           0x00000000        0x0 src/crc.o
+ .text.crc32_calculate
+                0x00000000       0x74 src/crc.o
+ .comment       0x00000000       0x1f src/crc.o
+ .ARM.attributes
+                0x00000000       0x2e src/crc.o
  .text          0x00000000        0x0 startup/startup.o
  .data          0x00000000        0x0 startup/startup.o
  .bss           0x00000000        0x0 startup/startup.o
@@ -60,7 +65,7 @@ LOAD startup/startup.o
                 0x08000080                        . = ALIGN (0x80)
  *fill*         0x08000040       0x40 
 
-.text           0x08000080      0xbcc
+.text           0x08000080      0xbb0
  *(.text)
  *(.text.*)
  .text.uart_write_string
@@ -107,78 +112,75 @@ LOAD startup/startup.o
                 0x08000930      0x124 src/image.o
                 0x08000930                image_program
  .text.image_crc32
-                0x08000a54       0x54 src/image.o
+                0x08000a54       0xac src/image.o
                 0x08000a54                image_crc32
  .text.uart2_init
-                0x08000aa8       0x94 src/uart.o
-                0x08000aa8                uart2_init
+                0x08000b00       0x94 src/uart.o
+                0x08000b00                uart2_init
  .text.uart2_write_char
-                0x08000b3c       0x30 src/uart.o
-                0x08000b3c                uart2_write_char
+                0x08000b94       0x30 src/uart.o
+                0x08000b94                uart2_write_char
  .text.uart2_read_char
-                0x08000b6c       0x28 src/uart.o
-                0x08000b6c                uart2_read_char
- .text.crc32_calculate
-                0x08000b94       0x74 src/crc.o
-                0x08000b94                crc32_calculate
+                0x08000bc4       0x28 src/uart.o
+                0x08000bc4                uart2_read_char
  .text.Reset_Handler
-                0x08000c08       0x40 startup/startup.o
-                0x08000c08                Reset_Handler
+                0x08000bec       0x40 startup/startup.o
+                0x08000bec                Reset_Handler
  .text.Default_Handler
-                0x08000c48        0x4 startup/startup.o
-                0x08000c48                DebugMon_Handler
-                0x08000c48                HardFault_Handler
-                0x08000c48                SysTick_Handler
-                0x08000c48                PendSV_Handler
-                0x08000c48                NMI_Handler
-                0x08000c48                UsageFault_Handler
-                0x08000c48                Default_Handler
-                0x08000c48                MemManage_Handler
-                0x08000c48                SVC_Handler
-                0x08000c48                BusFault_Handler
+                0x08000c2c        0x4 startup/startup.o
+                0x08000c2c                DebugMon_Handler
+                0x08000c2c                HardFault_Handler
+                0x08000c2c                SysTick_Handler
+                0x08000c2c                PendSV_Handler
+                0x08000c2c                NMI_Handler
+                0x08000c2c                UsageFault_Handler
+                0x08000c2c                Default_Handler
+                0x08000c2c                MemManage_Handler
+                0x08000c2c                SVC_Handler
+                0x08000c2c                BusFault_Handler
 
-.glue_7         0x08000c4c        0x0
- .glue_7        0x08000c4c        0x0 linker stubs
+.glue_7         0x08000c30        0x0
+ .glue_7        0x08000c30        0x0 linker stubs
 
-.glue_7t        0x08000c4c        0x0
- .glue_7t       0x08000c4c        0x0 linker stubs
+.glue_7t        0x08000c30        0x0
+ .glue_7t       0x08000c30        0x0 linker stubs
 
-.vfp11_veneer   0x08000c4c        0x0
- .vfp11_veneer  0x08000c4c        0x0 linker stubs
+.vfp11_veneer   0x08000c30        0x0
+ .vfp11_veneer  0x08000c30        0x0 linker stubs
 
-.v4_bx          0x08000c4c        0x0
- .v4_bx         0x08000c4c        0x0 linker stubs
+.v4_bx          0x08000c30        0x0
+ .v4_bx         0x08000c30        0x0 linker stubs
 
-.iplt           0x08000c4c        0x0
- .iplt          0x08000c4c        0x0 src/main.o
+.iplt           0x08000c30        0x0
+ .iplt          0x08000c30        0x0 src/main.o
 
-.rodata         0x08000c4c      0x18e
+.rodata         0x08000c30      0x18e
  *(.rodata)
- .rodata        0x08000c4c      0x15e src/main.o
+ .rodata        0x08000c30      0x15e src/main.o
  *(.rodata.*)
- *fill*         0x08000daa        0x2 
- .rodata.hex.2  0x08000dac       0x11 src/main.o
- *fill*         0x08000dbd        0x3 
+ *fill*         0x08000d8e        0x2 
+ .rodata.hex.2  0x08000d90       0x11 src/main.o
+ *fill*         0x08000da1        0x3 
  .rodata.info.1
-                0x08000dc0        0x9 src/main.o
- *fill*         0x08000dc9        0x3 
+                0x08000da4        0x9 src/main.o
+ *fill*         0x08000dad        0x3 
  .rodata.prefix.0
-                0x08000dcc        0xe src/main.o
-                0x08000dda                        _sidata = LOADADDR (.data)
+                0x08000db0        0xe src/main.o
+                0x08000dbe                        _sidata = LOADADDR (.data)
 
-.rel.dyn        0x08000ddc        0x0
- .rel.iplt      0x08000ddc        0x0 src/main.o
+.rel.dyn        0x08000dc0        0x0
+ .rel.iplt      0x08000dc0        0x0 src/main.o
 
-.data           0x20000000        0x0 load address 0x08000dda
+.data           0x20000000        0x0 load address 0x08000dbe
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
                 0x20000000                        _edata = .
 
-.igot.plt       0x20000000        0x0 load address 0x08000dda
+.igot.plt       0x20000000        0x0 load address 0x08000dbe
  .igot.plt      0x20000000        0x0 src/main.o
 
-.bss            0x20000000        0x0 load address 0x08000dda
+.bss            0x20000000        0x0 load address 0x08000dbe
                 0x20000000                        _sbss = .
  *(.bss)
  *(.bss.*)
@@ -198,8 +200,6 @@ LOAD linker stubs
                                  0x1f (size before relaxing)
  .comment       0x0000001e        0x0 src/uart.o
                                  0x1f (size before relaxing)
- .comment       0x0000001e        0x0 src/crc.o
-                                 0x1f (size before relaxing)
 
 .ARM.attributes
                 0x00000000       0x30
@@ -212,6 +212,4 @@ LOAD linker stubs
  .ARM.attributes
                 0x0000008a       0x2e src/uart.o
  .ARM.attributes
-                0x000000b8       0x2e src/crc.o
- .ARM.attributes
-                0x000000e6       0x25 startup/startup.o
+                0x000000b8       0x25 startup/startup.o
